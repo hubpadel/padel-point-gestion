@@ -54,6 +54,32 @@ nav button:hover{background:#253041}
 .form-grid input,.form-grid select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
 .notice{background:#fff7e8;border:1px solid #f0dfb9;color:#8a6110;padding:12px;border-radius:10px;margin-bottom:14px}
+
+.planner-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.planner-toolbar h3{margin:0;font-size:22px;text-transform:capitalize}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#fff;border:1px solid var(--line);padding:7px 9px;border-radius:999px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dot.clase{background:var(--clase)}.dot.abierta{background:var(--abierta)}.dot.torneo{background:var(--torneo)}
+.dot.tercero{background:var(--tercero)}.dot.corporativo{background:var(--corporativo)}
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr);background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.weekday{padding:10px;text-align:center;font-size:11px;font-weight:800;color:var(--muted);background:#fafbfc;border-right:1px solid var(--line)}
+.weekday:nth-child(7){border-right:0}
+.day-cell{min-height:125px;padding:8px;border-top:1px solid var(--line);border-right:1px solid var(--line);background:#fff;overflow:hidden}
+.day-cell:nth-child(7n){border-right:0}
+.day-cell.outside{background:#fafbfc;color:#a8b0ba}
+.day-number{font-size:12px;font-weight:900;margin-bottom:5px}
+.cal-event{font-size:10px;padding:5px 6px;border-radius:6px;margin-top:4px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-event.clase{background:#e9f5f1;color:var(--clase)}
+.cal-event.abierta{background:#fff2dc;color:#9a6800}
+.cal-event.torneo{background:#eaf1ff;color:var(--torneo)}
+.cal-event.tercero{background:#f0e9ff;color:var(--tercero)}
+.cal-event.corporativo{background:#fdeaea;color:var(--corporativo)}
+.finance-source{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.finance-source:last-child{border-bottom:0}
+.finance-source .name{font-weight:800}
+.finance-source .details{font-size:12px;color:var(--muted);margin-top:3px}
+
 @media(max-width:900px){.sidebar{width:205px}.content{margin-left:205px}.grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -126,6 +152,7 @@ const modalFields = document.getElementById('modal-fields')
 
 let currentProfile = null
 let editing = { page:null, id:null }
+let plannerDate = new Date()
 
 const cfg = {
   clases:{table:'classes',title:'Clases',subtitle:'Cargá y administrá clases.',fields:[
@@ -222,8 +249,49 @@ async function navigate(page){
   pageTitle.textContent=titles[page]
   if(page==='dashboard') return renderDashboard()
   if(page==='planner') return renderPlanner()
+  if(page==='finanzas') return renderFinance()
   if(page==='reportes') return renderReports()
   return renderCrud(page)
+}
+
+async function getFinanceData(){
+  const [classes,openCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
+    supabase.from('classes').select('*'),
+    supabase.from('open_courts').select('*'),
+    supabase.from('own_tournaments').select('*'),
+    supabase.from('third_party_tournaments').select('*'),
+    supabase.from('corporate_events').select('*'),
+    supabase.from('financial_movements').select('*')
+  ])
+
+  const c = classes.data||[]
+  const a = openCourts.data||[]
+  const t = ownTournaments.data||[]
+  const th = thirdParty.data||[]
+  const co = corporate.data||[]
+  const mov = movements.data||[]
+
+  const classIncome = c.filter(x=>x.payment_status==='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
+  const classPending = c.filter(x=>x.payment_status!=='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
+  const openIncome = a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+(Number(x.registered||0)*Number(x.value||0)),0)
+  const tournamentIncome = t.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.expected_income||0),0)
+  const thirdCollected = th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.value||0)-Number(x.balance||0)),0)
+  const thirdPending = th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
+  const corpCollected = co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.budget||0)-Number(x.balance||0)),0)
+  const corpPending = co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
+
+  const manualIncome = mov.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount||0),0)
+  const manualExpenses = mov.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount||0),0)
+
+  const automaticIncome = classIncome + openIncome + tournamentIncome + thirdCollected + corpCollected
+  const totalIncome = automaticIncome + manualIncome
+  const pending = classPending + thirdPending + corpPending
+  const result = totalIncome - manualExpenses
+
+  return {
+    classIncome,classPending,openIncome,tournamentIncome,thirdCollected,thirdPending,corpCollected,corpPending,
+    manualIncome,manualExpenses,automaticIncome,totalIncome,pending,result,movements:mov
+  }
 }
 
 async function renderDashboard(){
@@ -236,10 +304,8 @@ async function renderDashboard(){
   ])
   let finance=''
   if(currentProfile.role==='admin'){
-    const {data:movs=[]}=await supabase.from('financial_movements').select('type,amount')
-    const ingresos=movs.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount),0)
-    const gastos=movs.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0)
-    finance=`<div class="card"><div class="small">Resultado</div><div class="metric">${money(ingresos-gastos)}</div></div>`
+    const f=await getFinanceData()
+    finance=`<div class="card"><div class="small">Resultado</div><div class="metric">${money(f.result)}</div></div>`
   } else {
     finance=`<div class="card"><div class="small">Perfil</div><div class="metric" style="font-size:20px">Operativo</div></div>`
   }
@@ -252,22 +318,142 @@ async function renderDashboard(){
 
 async function renderPlanner(){
   const [c,a,t,x,e]=await Promise.all([
-    supabase.from('classes').select('date,time,student_name'),
-    supabase.from('open_courts').select('date,time,category'),
-    supabase.from('own_tournaments').select('date,name'),
-    supabase.from('third_party_tournaments').select('date,organizer'),
-    supabase.from('corporate_events').select('date,company')
+    supabase.from('classes').select('date,time,student_name,status'),
+    supabase.from('open_courts').select('date,time,category,status'),
+    supabase.from('own_tournaments').select('date,name,status'),
+    supabase.from('third_party_tournaments').select('date,organizer,status'),
+    supabase.from('corporate_events').select('date,company,status')
   ])
-  const rows=[]
-  ;(c.data||[]).forEach(v=>rows.push([v.date,v.time||'','Clase',v.student_name,'clase']))
-  ;(a.data||[]).forEach(v=>rows.push([v.date,v.time||'','Cancha abierta',v.category,'abierta']))
-  ;(t.data||[]).forEach(v=>rows.push([v.date,'','Torneo propio',v.name,'torneo']))
-  ;(x.data||[]).forEach(v=>rows.push([v.date,'','Torneo tercero',v.organizer,'tercero']))
-  ;(e.data||[]).forEach(v=>rows.push([v.date,'','Corporativo',v.company,'corporativo']))
-  rows.sort((p,q)=>(p[0]+p[1]).localeCompare(q[0]+q[1]))
-  pageContent.innerHTML=`<table class="table"><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td><span class="tag ${r[4]}">${r[2]}</span></td><td>${r[3]}</td></tr>`).join('')}
-    </tbody></table>`
+
+  const events={}
+  const push=(date,obj)=>{
+    if(!date)return
+    if(!events[date])events[date]=[]
+    events[date].push(obj)
+  }
+
+  ;(c.data||[]).filter(v=>v.status!=='Cancelada').forEach(v=>push(v.date,{type:'clase',text:`${v.time?v.time.slice(0,5)+' ':''}Clase · ${v.student_name}`}))
+  ;(a.data||[]).filter(v=>v.status!=='Cancelada').forEach(v=>push(v.date,{type:'abierta',text:`${v.time?v.time.slice(0,5)+' ':''}Abierta · ${v.category}`}))
+  ;(t.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'torneo',text:`Torneo · ${v.name}`}))
+  ;(x.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'tercero',text:`Torneo 3° · ${v.organizer}`}))
+  ;(e.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'corporativo',text:`Empresa · ${v.company}`}))
+
+  const year=plannerDate.getFullYear()
+  const month=plannerDate.getMonth()
+  const first=new Date(year,month,1)
+  const firstMondayIndex=(first.getDay()+6)%7
+  const start=new Date(year,month,1-firstMondayIndex)
+  const monthName=new Intl.DateTimeFormat('es-AR',{month:'long',year:'numeric'}).format(new Date(year,month,1))
+  const weekdays=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM']
+
+  let cells=''
+  for(let i=0;i<42;i++){
+    const d=new Date(start)
+    d.setDate(start.getDate()+i)
+    const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const outside=d.getMonth()!==month
+    const dayEvents=events[iso]||[]
+    cells+=`<div class="day-cell ${outside?'outside':''}">
+      <div class="day-number">${d.getDate()}</div>
+      ${dayEvents.map(ev=>`<div class="cal-event ${ev.type}" title="${ev.text}">${ev.text}</div>`).join('')}
+    </div>`
+  }
+
+  pageContent.innerHTML=`
+    <div class="planner-toolbar">
+      <button id="prev-month" class="btn secondary">← Mes anterior</button>
+      <h3>${monthName}</h3>
+      <button id="next-month" class="btn secondary">Mes siguiente →</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot clase"></i>Clases</span>
+      <span><i class="dot abierta"></i>Canchas abiertas</span>
+      <span><i class="dot torneo"></i>Torneos propios</span>
+      <span><i class="dot tercero"></i>Torneos de terceros</span>
+      <span><i class="dot corporativo"></i>Corporativos</span>
+    </div>
+    <div class="month-grid">
+      ${weekdays.map(w=>`<div class="weekday">${w}</div>`).join('')}
+      ${cells}
+    </div>`
+
+  document.getElementById('prev-month').addEventListener('click',()=>{
+    plannerDate=new Date(year,month-1,1)
+    renderPlanner()
+  })
+  document.getElementById('next-month').addEventListener('click',()=>{
+    plannerDate=new Date(year,month+1,1)
+    renderPlanner()
+  })
+}
+
+async function renderFinance(){
+  const f=await getFinanceData()
+
+  pageContent.innerHTML=`
+    <div class="hero">
+      <div>
+        <h3>Finanzas automáticas</h3>
+        <p>Los ingresos se calculan directamente desde todos los módulos cargados.</p>
+      </div>
+      <button id="add-expense-btn" class="btn">+ Ingreso / gasto manual</button>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="small">Ingresos automáticos</div><div class="metric">${money(f.automaticIncome)}</div></div>
+      <div class="card"><div class="small">Ingresos manuales</div><div class="metric">${money(f.manualIncome)}</div></div>
+      <div class="card"><div class="small">Gastos</div><div class="metric">${money(f.manualExpenses)}</div></div>
+      <div class="card"><div class="small">Resultado</div><div class="metric">${money(f.result)}</div></div>
+    </div>
+
+    <div class="grid" style="margin-top:14px">
+      <div class="card"><div class="small">Pendiente de cobro</div><div class="metric">${money(f.pending)}</div></div>
+      <div class="card"><div class="small">Lorena 50%</div><div class="metric">${money(f.result/2)}</div></div>
+      <div class="card"><div class="small">Marita 50%</div><div class="metric">${money(f.result/2)}</div></div>
+      <div class="card"><div class="small">Ingresos totales</div><div class="metric">${money(f.totalIncome)}</div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Ingresos por actividad</h3>
+      <div class="finance-source">
+        <div><div class="name">Clases</div><div class="details">Solo clases marcadas como Pagado</div></div>
+        <div><b>${money(f.classIncome)}</b><div class="small">Pendiente ${money(f.classPending)}</div></div>
+      </div>
+      <div class="finance-source">
+        <div><div class="name">Canchas abiertas</div><div class="details">Inscriptos × valor por jugador</div></div>
+        <b>${money(f.openIncome)}</b>
+      </div>
+      <div class="finance-source">
+        <div><div class="name">Torneos propios</div><div class="details">Ingreso previsto cargado en cada torneo</div></div>
+        <b>${money(f.tournamentIncome)}</b>
+      </div>
+      <div class="finance-source">
+        <div><div class="name">Torneos de terceros</div><div class="details">Valor acordado menos saldo pendiente</div></div>
+        <div><b>${money(f.thirdCollected)}</b><div class="small">Pendiente ${money(f.thirdPending)}</div></div>
+      </div>
+      <div class="finance-source">
+        <div><div class="name">Eventos corporativos</div><div class="details">Presupuesto menos saldo pendiente</div></div>
+        <div><b>${money(f.corpCollected)}</b><div class="small">Pendiente ${money(f.corpPending)}</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Movimientos manuales</h3>
+      <table class="table">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Concepto</th><th>Importe</th></tr></thead>
+        <tbody>
+          ${f.movements.map(m=>`<tr>
+            <td>${m.date}</td>
+            <td>${m.type==='income'?'Ingreso':'Gasto'}</td>
+            <td>${m.category}</td>
+            <td>${m.description}</td>
+            <td>${money(m.amount)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`
+
+  document.getElementById('add-expense-btn').addEventListener('click',()=>openModal('finanzas',null))
 }
 
 async function renderCrud(page){
@@ -331,7 +517,8 @@ document.getElementById('save-modal').addEventListener('click',async()=>{
     : await supabase.from(c.table).insert(payload)
   if(res.error){alert('Error al guardar: '+res.error.message);return}
   modal.classList.add('hidden')
-  await renderCrud(page)
+  if(page==='finanzas') await renderFinance()
+  else await renderCrud(page)
 })
 
 async function deleteRow(page,id){
@@ -343,16 +530,12 @@ async function deleteRow(page,id){
 }
 
 async function renderReports(){
-  const {data:movs=[],error}=await supabase.from('financial_movements').select('type,amount')
-  if(error){pageContent.innerHTML=`<div class="notice">${error.message}</div>`;return}
-  const ingresos=movs.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount),0)
-  const gastos=movs.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0)
-  const resultado=ingresos-gastos
+  const f=await getFinanceData()
   pageContent.innerHTML=`<div class="grid">
-    <div class="card"><div class="small">Ingresos</div><div class="metric">${money(ingresos)}</div></div>
-    <div class="card"><div class="small">Gastos</div><div class="metric">${money(gastos)}</div></div>
-    <div class="card"><div class="small">Resultado</div><div class="metric">${money(resultado)}</div></div>
-    <div class="card"><div class="small">50% por socia</div><div class="metric">${money(resultado/2)}</div></div>
+    <div class="card"><div class="small">Ingresos totales</div><div class="metric">${money(f.totalIncome)}</div></div>
+    <div class="card"><div class="small">Gastos</div><div class="metric">${money(f.manualExpenses)}</div></div>
+    <div class="card"><div class="small">Resultado</div><div class="metric">${money(f.result)}</div></div>
+    <div class="card"><div class="small">50% por socia</div><div class="metric">${money(f.result/2)}</div></div>
   </div>`
 }
 
