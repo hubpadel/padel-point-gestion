@@ -79,6 +79,11 @@ nav button:hover{background:#253041}
 .finance-source:last-child{border-bottom:0}
 .finance-source .name{font-weight:800}
 .finance-source .details{font-size:12px;color:var(--muted);margin-top:3px}
+.month-select{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.month-select select{padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.hub-card{background:#f0e9ff;border:1px solid #ddd1f5}
+.hub-card .metric{color:#6f42c1}
+.highlight{background:#f8fbfa;border:1px solid #dcebe7}
 
 @media(max-width:900px){.sidebar{width:205px}.content{margin-left:205px}.grid{grid-template-columns:repeat(2,1fr)}}
 </style>
@@ -153,15 +158,18 @@ const modalFields = document.getElementById('modal-fields')
 let currentProfile = null
 let editing = { page:null, id:null }
 let plannerDate = new Date()
+let financeMonth = new Date().getMonth()
+let financeYear = new Date().getFullYear()
 
 const cfg = {
   clases:{table:'classes',title:'Clases',subtitle:'Cargá y administrá clases.',fields:[
     ['date','date','Fecha'],['time','time','Hora'],['student_name','text','Alumno'],['teacher_name','text','Profesor'],
     ['status','select','Estado',['Pendiente','Confirmada','Cancelada']],['payment_status','select','Pago',['Pendiente','Pagado']],['value','number','Valor']
   ]},
-  abiertas:{table:'open_courts',title:'Canchas abiertas',subtitle:'Cupos, categoría y valor por jugador.',fields:[
+  abiertas:{table:'open_courts',title:'Canchas abiertas',subtitle:'Cupos, categoría, valor y pago al coordinador.',fields:[
     ['date','date','Fecha'],['time','time','Hora'],['category','text','Categoría'],['slots','number','Cupos'],['registered','number','Inscriptos'],
-    ['value','number','Valor por jugador'],['status','select','Estado',['Abierta','Completa','Cerrada','Cancelada']]
+    ['value','number','Valor por jugador'],['coordinator_payment','number','Pago coordinador'],
+    ['status','select','Estado',['Abierta','Completa','Cerrada','Cancelada']]
   ]},
   torneos:{table:'own_tournaments',title:'Torneos propios',subtitle:'Gestión de torneos organizados por Pádel Point.',fields:[
     ['date','date','Fecha'],['name','text','Nombre'],['category','text','Categoría'],['pairs','number','Parejas'],['expected_income','number','Ingreso previsto'],
@@ -185,12 +193,14 @@ const cfg = {
 
 const labels = {
   date:'Fecha',time:'Hora',student_name:'Alumno',teacher_name:'Profesor',status:'Estado',payment_status:'Pago',value:'Valor',
-  category:'Categoría',slots:'Cupos',registered:'Inscriptos',name:'Nombre',pairs:'Parejas',expected_income:'Ingreso previsto',
+  category:'Categoría',slots:'Cupos',registered:'Inscriptos',coordinator_payment:'Pago coordinador',name:'Nombre',pairs:'Parejas',expected_income:'Ingreso previsto',
   organizer:'Organizador',courts:'Canchas',balance:'Saldo',company:'Empresa',people:'Personas',budget:'Presupuesto',
   type:'Tipo',phone:'Teléfono',description:'Concepto',amount:'Importe'
 }
 
 const money = v => '$'+Number(v||0).toLocaleString('es-AR')
+const monthKey = dateStr => dateStr ? dateStr.slice(0,7) : ''
+const selectedMonthKey = () => `${financeYear}-${String(financeMonth+1).padStart(2,'0')}`
 
 async function getProfile(userId){
   const {data,error}=await supabase.from('profiles').select('id,full_name,role').eq('id',userId).single()
@@ -264,33 +274,39 @@ async function getFinanceData(){
     supabase.from('financial_movements').select('*')
   ])
 
-  const c = classes.data||[]
-  const a = openCourts.data||[]
-  const t = ownTournaments.data||[]
-  const th = thirdParty.data||[]
-  const co = corporate.data||[]
-  const mov = movements.data||[]
+  const key=selectedMonthKey()
+  const c=(classes.data||[]).filter(x=>monthKey(x.date)===key)
+  const a=(openCourts.data||[]).filter(x=>monthKey(x.date)===key)
+  const t=(ownTournaments.data||[]).filter(x=>monthKey(x.date)===key)
+  const th=(thirdParty.data||[]).filter(x=>monthKey(x.date)===key)
+  const co=(corporate.data||[]).filter(x=>monthKey(x.date)===key)
+  const mov=(movements.data||[]).filter(x=>monthKey(x.date)===key)
 
-  const classIncome = c.filter(x=>x.payment_status==='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
-  const classPending = c.filter(x=>x.payment_status!=='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
-  const openIncome = a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+(Number(x.registered||0)*Number(x.value||0)),0)
-  const tournamentIncome = t.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.expected_income||0),0)
-  const thirdCollected = th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.value||0)-Number(x.balance||0)),0)
-  const thirdPending = th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
-  const corpCollected = co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.budget||0)-Number(x.balance||0)),0)
-  const corpPending = co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
+  const classIncome=c.filter(x=>x.payment_status==='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
+  const classPending=c.filter(x=>x.payment_status!=='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
+  const openIncome=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+(Number(x.registered||0)*Number(x.value||0)),0)
+  const coordinatorExpense=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+Number(x.coordinator_payment||0),0)
+  const tournamentIncome=t.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.expected_income||0),0)
+  const thirdCollected=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.value||0)-Number(x.balance||0)),0)
+  const thirdPending=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
+  const corpCollected=co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.budget||0)-Number(x.balance||0)),0)
+  const corpPending=co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
 
-  const manualIncome = mov.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount||0),0)
-  const manualExpenses = mov.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount||0),0)
+  const manualIncome=mov.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount||0),0)
+  const manualExpenses=mov.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount||0),0)
 
-  const automaticIncome = classIncome + openIncome + tournamentIncome + thirdCollected + corpCollected
-  const totalIncome = automaticIncome + manualIncome
-  const pending = classPending + thirdPending + corpPending
-  const result = totalIncome - manualExpenses
+  const automaticIncome=classIncome+openIncome+tournamentIncome+thirdCollected+corpCollected
+  const totalBilling=automaticIncome+manualIncome
+  const hubCommission=totalBilling*0.10
+  const totalExpenses=manualExpenses+coordinatorExpense
+  const pending=classPending+thirdPending+corpPending
+  const result=totalBilling-totalExpenses-hubCommission
 
   return {
-    classIncome,classPending,openIncome,tournamentIncome,thirdCollected,thirdPending,corpCollected,corpPending,
-    manualIncome,manualExpenses,automaticIncome,totalIncome,pending,result,movements:mov
+    classIncome,classPending,openIncome,coordinatorExpense,tournamentIncome,
+    thirdCollected,thirdPending,corpCollected,corpPending,
+    manualIncome,manualExpenses,automaticIncome,totalBilling,hubCommission,totalExpenses,pending,result,
+    movements:mov
   }
 }
 
@@ -389,51 +405,57 @@ async function renderPlanner(){
 
 async function renderFinance(){
   const f=await getFinanceData()
+  const monthName=new Intl.DateTimeFormat('es-AR',{month:'long'}).format(new Date(financeYear,financeMonth,1))
+  const years=[]
+  for(let y=financeYear-2;y<=financeYear+2;y++) years.push(`<option value="${y}" ${y===financeYear?'selected':''}>${y}</option>`)
 
   pageContent.innerHTML=`
     <div class="hero">
       <div>
-        <h3>Finanzas automáticas</h3>
-        <p>Los ingresos se calculan directamente desde todos los módulos cargados.</p>
+        <h3>Finanzas mensuales</h3>
+        <p>Facturación, gastos y Comisión HUB calculados por mes.</p>
       </div>
       <button id="add-expense-btn" class="btn">+ Ingreso / gasto manual</button>
     </div>
 
+    <div class="month-select">
+      <select id="finance-month">
+        ${Array.from({length:12},(_,i)=>{
+          const n=new Intl.DateTimeFormat('es-AR',{month:'long'}).format(new Date(2026,i,1))
+          return `<option value="${i}" ${i===financeMonth?'selected':''}>${n}</option>`
+        }).join('')}
+      </select>
+      <select id="finance-year">${years.join('')}</select>
+    </div>
+
     <div class="grid">
-      <div class="card"><div class="small">Ingresos automáticos</div><div class="metric">${money(f.automaticIncome)}</div></div>
-      <div class="card"><div class="small">Ingresos manuales</div><div class="metric">${money(f.manualIncome)}</div></div>
-      <div class="card"><div class="small">Gastos</div><div class="metric">${money(f.manualExpenses)}</div></div>
-      <div class="card"><div class="small">Resultado</div><div class="metric">${money(f.result)}</div></div>
+      <div class="card"><div class="small">Facturación del mes</div><div class="metric">${money(f.totalBilling)}</div></div>
+      <div class="card"><div class="small">Gastos del mes</div><div class="metric">${money(f.totalExpenses)}</div></div>
+      <div class="card hub-card"><div class="small">Comisión HUB 10%</div><div class="metric">${money(f.hubCommission)}</div></div>
+      <div class="card highlight"><div class="small">Resultado final</div><div class="metric">${money(f.result)}</div></div>
     </div>
 
     <div class="grid" style="margin-top:14px">
       <div class="card"><div class="small">Pendiente de cobro</div><div class="metric">${money(f.pending)}</div></div>
-      <div class="card"><div class="small">Lorena 50%</div><div class="metric">${money(f.result/2)}</div></div>
-      <div class="card"><div class="small">Marita 50%</div><div class="metric">${money(f.result/2)}</div></div>
-      <div class="card"><div class="small">Ingresos totales</div><div class="metric">${money(f.totalIncome)}</div></div>
+      <div class="card"><div class="small">Ingresos automáticos</div><div class="metric">${money(f.automaticIncome)}</div></div>
+      <div class="card"><div class="small">Ingresos manuales</div><div class="metric">${money(f.manualIncome)}</div></div>
+      <div class="card"><div class="small">Gastos manuales</div><div class="metric">${money(f.manualExpenses)}</div></div>
     </div>
 
     <div class="card" style="margin-top:16px">
-      <h3 style="margin-top:0">Ingresos por actividad</h3>
+      <h3 style="margin-top:0">Facturación · ${monthName} ${financeYear}</h3>
+      <div class="finance-source"><div><div class="name">Clases</div><div class="details">Luego lo conectamos al programa externo de clases.</div></div><div><b>${money(f.classIncome)}</b><div class="small">Pendiente ${money(f.classPending)}</div></div></div>
+      <div class="finance-source"><div><div class="name">Canchas abiertas</div><div class="details">Inscriptos × valor por jugador</div></div><b>${money(f.openIncome)}</b></div>
+      <div class="finance-source"><div><div class="name">Torneos propios</div><div class="details">Ingreso previsto</div></div><b>${money(f.tournamentIncome)}</b></div>
+      <div class="finance-source"><div><div class="name">Torneos de terceros</div><div class="details">Valor menos saldo</div></div><div><b>${money(f.thirdCollected)}</b><div class="small">Pendiente ${money(f.thirdPending)}</div></div></div>
+      <div class="finance-source"><div><div class="name">Eventos corporativos</div><div class="details">Presupuesto menos saldo</div></div><div><b>${money(f.corpCollected)}</b><div class="small">Pendiente ${money(f.corpPending)}</div></div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Gastos automáticos</h3>
       <div class="finance-source">
-        <div><div class="name">Clases</div><div class="details">Solo clases marcadas como Pagado</div></div>
-        <div><b>${money(f.classIncome)}</b><div class="small">Pendiente ${money(f.classPending)}</div></div>
-      </div>
-      <div class="finance-source">
-        <div><div class="name">Canchas abiertas</div><div class="details">Inscriptos × valor por jugador</div></div>
-        <b>${money(f.openIncome)}</b>
-      </div>
-      <div class="finance-source">
-        <div><div class="name">Torneos propios</div><div class="details">Ingreso previsto cargado en cada torneo</div></div>
-        <b>${money(f.tournamentIncome)}</b>
-      </div>
-      <div class="finance-source">
-        <div><div class="name">Torneos de terceros</div><div class="details">Valor acordado menos saldo pendiente</div></div>
-        <div><b>${money(f.thirdCollected)}</b><div class="small">Pendiente ${money(f.thirdPending)}</div></div>
-      </div>
-      <div class="finance-source">
-        <div><div class="name">Eventos corporativos</div><div class="details">Presupuesto menos saldo pendiente</div></div>
-        <div><b>${money(f.corpCollected)}</b><div class="small">Pendiente ${money(f.corpPending)}</div></div>
+        <div><div class="name">Coordinadores de canchas abiertas</div><div class="details">Suma del pago al coordinador de cada cancha abierta del mes</div></div>
+        <b>${money(f.coordinatorExpense)}</b>
       </div>
     </div>
 
@@ -441,18 +463,12 @@ async function renderFinance(){
       <h3 style="margin-top:0">Movimientos manuales</h3>
       <table class="table">
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Concepto</th><th>Importe</th></tr></thead>
-        <tbody>
-          ${f.movements.map(m=>`<tr>
-            <td>${m.date}</td>
-            <td>${m.type==='income'?'Ingreso':'Gasto'}</td>
-            <td>${m.category}</td>
-            <td>${m.description}</td>
-            <td>${money(m.amount)}</td>
-          </tr>`).join('')}
-        </tbody>
+        <tbody>${f.movements.map(m=>`<tr><td>${m.date}</td><td>${m.type==='income'?'Ingreso':'Gasto'}</td><td>${m.category}</td><td>${m.description}</td><td>${money(m.amount)}</td></tr>`).join('')}</tbody>
       </table>
     </div>`
 
+  document.getElementById('finance-month').addEventListener('change',e=>{financeMonth=Number(e.target.value);renderFinance()})
+  document.getElementById('finance-year').addEventListener('change',e=>{financeYear=Number(e.target.value);renderFinance()})
   document.getElementById('add-expense-btn').addEventListener('click',()=>openModal('finanzas',null))
 }
 
@@ -473,7 +489,7 @@ async function renderCrud(page){
 }
 
 function formatCell(field,v){
-  if(['value','expected_income','balance','budget','amount'].includes(field)) return money(v)
+  if(['value','expected_income','balance','budget','amount','coordinator_payment'].includes(field)) return money(v)
   if(field==='type'&&v==='income') return 'Ingreso'
   if(field==='type'&&v==='expense') return 'Gasto'
   return v??''
@@ -532,10 +548,10 @@ async function deleteRow(page,id){
 async function renderReports(){
   const f=await getFinanceData()
   pageContent.innerHTML=`<div class="grid">
-    <div class="card"><div class="small">Ingresos totales</div><div class="metric">${money(f.totalIncome)}</div></div>
-    <div class="card"><div class="small">Gastos</div><div class="metric">${money(f.manualExpenses)}</div></div>
-    <div class="card"><div class="small">Resultado</div><div class="metric">${money(f.result)}</div></div>
-    <div class="card"><div class="small">50% por socia</div><div class="metric">${money(f.result/2)}</div></div>
+    <div class="card"><div class="small">Facturación</div><div class="metric">${money(f.totalBilling)}</div></div>
+    <div class="card"><div class="small">Gastos</div><div class="metric">${money(f.totalExpenses)}</div></div>
+    <div class="card hub-card"><div class="small">Comisión HUB 10%</div><div class="metric">${money(f.hubCommission)}</div></div>
+    <div class="card highlight"><div class="small">Resultado final</div><div class="metric">${money(f.result)}</div></div>
   </div>`
 }
 
