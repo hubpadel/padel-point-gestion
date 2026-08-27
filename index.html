@@ -146,6 +146,10 @@ const SUPABASE_URL = 'https://eodngcsolkixjkgjipzp.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_cJ01J0FhhLL0Lzgrz-64qw_Bdeoro_z'
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
 
+const CLASSES_SUPABASE_URL = 'https://jpzoaskdtgfvvfpdbqox.supabase.co'
+const CLASSES_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yj3PONOs9YIlwYFiqiuV-A_ogIDN-Pr'
+const classesSupabase = createClient(CLASSES_SUPABASE_URL, CLASSES_SUPABASE_PUBLISHABLE_KEY)
+
 const authView = document.getElementById('auth-view')
 const mainView = document.getElementById('main-view')
 const pageContent = document.getElementById('page-content')
@@ -265,8 +269,15 @@ async function navigate(page){
 }
 
 async function getFinanceData(){
-  const [classes,openCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
-    supabase.from('classes').select('*'),
+  const key=selectedMonthKey()
+  const startDate=`${key}-01`
+  const nm=new Date(financeYear,financeMonth+1,1)
+  const nextDate=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}-01`
+
+  const [extClasses,extPayments,extLiquids,openCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
+    classesSupabase.from('clases').select('id,fecha').gte('fecha',startDate).lt('fecha',nextDate),
+    classesSupabase.from('pagos').select('fecha_cobro,importe').gte('fecha_cobro',startDate).lt('fecha_cobro',nextDate),
+    classesSupabase.from('liquidaciones_profesores').select('mes,total_a_liquidar').gte('mes',startDate).lt('mes',nextDate),
     supabase.from('open_courts').select('*'),
     supabase.from('own_tournaments').select('*'),
     supabase.from('third_party_tournaments').select('*'),
@@ -274,16 +285,16 @@ async function getFinanceData(){
     supabase.from('financial_movements').select('*')
   ])
 
-  const key=selectedMonthKey()
-  const c=(classes.data||[]).filter(x=>monthKey(x.date)===key)
   const a=(openCourts.data||[]).filter(x=>monthKey(x.date)===key)
   const t=(ownTournaments.data||[]).filter(x=>monthKey(x.date)===key)
   const th=(thirdParty.data||[]).filter(x=>monthKey(x.date)===key)
   const co=(corporate.data||[]).filter(x=>monthKey(x.date)===key)
   const mov=(movements.data||[]).filter(x=>monthKey(x.date)===key)
 
-  const classIncome=c.filter(x=>x.payment_status==='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
-  const classPending=c.filter(x=>x.payment_status!=='Pagado' && x.status!=='Cancelada').reduce((s,x)=>s+Number(x.value||0),0)
+  const classCount=(extClasses.data||[]).length
+  const classIncome=(extPayments.data||[]).reduce((s,x)=>s+Number(x.importe||0),0)
+  const teacherExpense=(extLiquids.data||[]).reduce((s,x)=>s+Number(x.total_a_liquidar||0),0)
+
   const openIncome=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+(Number(x.registered||0)*Number(x.value||0)),0)
   const coordinatorExpense=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+Number(x.coordinator_payment||0),0)
   const tournamentIncome=t.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.expected_income||0),0)
@@ -291,23 +302,21 @@ async function getFinanceData(){
   const thirdPending=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
   const corpCollected=co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.budget||0)-Number(x.balance||0)),0)
   const corpPending=co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
-
   const manualIncome=mov.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount||0),0)
   const manualExpenses=mov.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount||0),0)
 
   const automaticIncome=classIncome+openIncome+tournamentIncome+thirdCollected+corpCollected
   const totalBilling=automaticIncome+manualIncome
   const hubCommission=totalBilling*0.10
-  const totalExpenses=manualExpenses+coordinatorExpense
-  const pending=classPending+thirdPending+corpPending
+  const totalExpenses=manualExpenses+coordinatorExpense+teacherExpense
+  const pending=thirdPending+corpPending
   const result=totalBilling-totalExpenses-hubCommission
 
-  return {
-    classIncome,classPending,openIncome,coordinatorExpense,tournamentIncome,
-    thirdCollected,thirdPending,corpCollected,corpPending,
-    manualIncome,manualExpenses,automaticIncome,totalBilling,hubCommission,totalExpenses,pending,result,
-    movements:mov
-  }
+  const externalErrors=[extClasses.error,extPayments.error,extLiquids.error].filter(Boolean).map(e=>e.message).join(' · ')
+
+  return {classCount,classIncome,teacherExpense,openIncome,coordinatorExpense,tournamentIncome,
+    thirdCollected,thirdPending,corpCollected,corpPending,manualIncome,manualExpenses,
+    automaticIncome,totalBilling,hubCommission,totalExpenses,pending,result,movements:mov,externalErrors}
 }
 
 async function renderDashboard(){
@@ -418,6 +427,7 @@ async function renderFinance(){
       <button id="add-expense-btn" class="btn">+ Ingreso / gasto manual</button>
     </div>
 
+    ${f.externalErrors ? `<div class="notice">No se pudieron leer algunos datos del programa de clases: ${f.externalErrors}</div>` : ''}
     <div class="month-select">
       <select id="finance-month">
         ${Array.from({length:12},(_,i)=>{
@@ -444,7 +454,7 @@ async function renderFinance(){
 
     <div class="card" style="margin-top:16px">
       <h3 style="margin-top:0">Facturación · ${monthName} ${financeYear}</h3>
-      <div class="finance-source"><div><div class="name">Clases</div><div class="details">Luego lo conectamos al programa externo de clases.</div></div><div><b>${money(f.classIncome)}</b><div class="small">Pendiente ${money(f.classPending)}</div></div></div>
+      <div class="finance-source"><div><div class="name">Clases</div><div class="details">Datos automáticos del programa de clases</div></div><div><b>${money(f.classIncome)}</b><div class="small">${f.classCount} clases en el mes</div></div></div>
       <div class="finance-source"><div><div class="name">Canchas abiertas</div><div class="details">Inscriptos × valor por jugador</div></div><b>${money(f.openIncome)}</b></div>
       <div class="finance-source"><div><div class="name">Torneos propios</div><div class="details">Ingreso previsto</div></div><b>${money(f.tournamentIncome)}</b></div>
       <div class="finance-source"><div><div class="name">Torneos de terceros</div><div class="details">Valor menos saldo</div></div><div><b>${money(f.thirdCollected)}</b><div class="small">Pendiente ${money(f.thirdPending)}</div></div></div>
@@ -456,6 +466,10 @@ async function renderFinance(){
       <div class="finance-source">
         <div><div class="name">Coordinadores de canchas abiertas</div><div class="details">Suma del pago al coordinador de cada cancha abierta del mes</div></div>
         <b>${money(f.coordinatorExpense)}</b>
+      </div>
+      <div class="finance-source">
+        <div><div class="name">Pago a profesores de clases</div><div class="details">Traído automáticamente del programa de clases</div></div>
+        <b>${money(f.teacherExpense)}</b>
       </div>
     </div>
 
