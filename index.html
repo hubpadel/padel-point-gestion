@@ -1,50 +1,362 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pádel Point Gestión</title>
-  <link rel="stylesheet" href="./styles.css" />
-  <script type="module" src="./app.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pádel Point Gestión</title>
+<style>
+:root{
+  --bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6c7783;--line:#e6e9ee;
+  --dark:#111827;--accent:#1f6f5f;--soft:#e9f5f1;
+  --clase:#1f6f5f;--abierta:#d48a0f;--torneo:#315fa8;--tercero:#6f42c1;--corporativo:#b64747;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.hidden{display:none!important}
+.center-screen{min-height:100vh;display:grid;place-items:center}
+.login-card{width:min(420px,90vw);background:#fff;padding:28px;border-radius:18px;border:1px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,.08)}
+.login-card h1{margin:0 0 8px;font-size:34px}
+.login-card p{margin:0 0 18px}
+.login-card input{width:100%;padding:12px;margin:8px 0;border:1px solid var(--line);border-radius:10px;background:#eef4ff}
+.login-card button{width:100%;padding:12px;margin-top:10px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer}
+.error{color:#b64747;font-size:12px;margin-top:10px}
+.sidebar{position:fixed;inset:0 auto 0 0;width:250px;background:var(--dark);padding:24px 16px;color:#fff;overflow:auto}
+.brand{font-size:22px;font-weight:900;margin-bottom:24px}
+nav{display:flex;flex-direction:column;gap:6px}
+nav button,.logout{border:0;background:transparent;color:#dbe1e8;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer}
+nav button:hover{background:#253041}
+.logout{position:absolute;bottom:20px;left:16px;right:16px;border:1px solid #394558}
+.content{margin-left:250px;min-height:100vh}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;background:#fff;border-bottom:1px solid var(--line)}
+#role-pill{padding:6px 10px;border-radius:999px;background:var(--soft);color:var(--accent);font-weight:800;font-size:12px}
+#page-content{padding:24px}
+.hero{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.hero h3{margin:0}.hero p{margin:4px 0 0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+.metric{font-size:28px;font-weight:900;margin-top:7px}
+.small{font-size:12px;color:var(--muted)}
+.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.table th,.table td{padding:11px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left}
+.table th{font-size:11px;color:var(--muted);text-transform:uppercase}
+.tag{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800}
+.clase{background:#e9f5f1;color:var(--clase)} .abierta{background:#fff2dc;color:#9a6800}
+.torneo{background:#eaf1ff;color:var(--torneo)} .tercero{background:#f0e9ff;color:var(--tercero)}
+.corporativo{background:#fdeaea;color:var(--corporativo)}
+.btn{border:0;background:var(--accent);color:#fff;border-radius:9px;padding:10px 14px;font-weight:800;cursor:pointer}
+.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+.btn.danger{background:#fff;color:#b64747;border:1px solid #e2bcbc}
+.actions{display:flex;gap:6px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.55);display:grid;place-items:center;padding:20px;z-index:20}
+.modal-card{width:min(680px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:22px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
+.form-grid input,.form-grid select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.notice{background:#fff7e8;border:1px solid #f0dfb9;color:#8a6110;padding:12px;border-radius:10px;margin-bottom:14px}
+@media(max-width:900px){.sidebar{width:205px}.content{margin-left:205px}.grid{grid-template-columns:repeat(2,1fr)}}
+</style>
 </head>
 <body>
-  <div id="app">
-    <section id="auth-view" class="center-screen">
-      <div class="login-card">
-        <h1>PÁDEL POINT</h1>
-        <p>Gestión integral</p>
-        <input id="email" type="email" placeholder="Email" />
-        <input id="password" type="password" placeholder="Contraseña" />
-        <button id="login-btn">Ingresar</button>
-        <div id="login-error" class="error"></div>
-      </div>
-    </section>
 
-    <section id="main-view" class="hidden">
-      <aside class="sidebar">
-        <div class="brand">PÁDEL POINT</div>
-        <nav>
-          <button data-page="dashboard">Inicio</button>
-          <button data-page="planner">Planner</button>
-          <button data-page="clases">Clases</button>
-          <button data-page="abiertas">Canchas abiertas</button>
-          <button data-page="torneos">Torneos propios</button>
-          <button data-page="terceros">Torneos de terceros</button>
-          <button data-page="corporativos">Eventos corporativos</button>
-          <button data-page="personas">Alumnos y profesores</button>
-          <button class="admin-only" data-page="finanzas">Finanzas</button>
-          <button class="admin-only" data-page="reportes">Reportes</button>
-        </nav>
-        <button id="logout-btn" class="logout">Salir</button>
-      </aside>
-      <main class="content">
-        <div class="topbar">
-          <h2 id="page-title">Inicio</h2>
-          <span id="role-pill"></span>
-        </div>
-        <div id="page-content"></div>
-      </main>
-    </section>
+<section id="auth-view" class="center-screen">
+  <div class="login-card">
+    <h1>PÁDEL POINT</h1>
+    <p>Gestión integral</p>
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Contraseña">
+    <button id="login-btn">Ingresar</button>
+    <div id="login-error" class="error"></div>
   </div>
+</section>
+
+<section id="main-view" class="hidden">
+  <aside class="sidebar">
+    <div class="brand">PÁDEL POINT</div>
+    <nav>
+      <button data-page="dashboard">Inicio</button>
+      <button data-page="planner">Planner</button>
+      <button data-page="clases">Clases</button>
+      <button data-page="abiertas">Canchas abiertas</button>
+      <button data-page="torneos">Torneos propios</button>
+      <button data-page="terceros">Torneos de terceros</button>
+      <button data-page="corporativos">Eventos corporativos</button>
+      <button data-page="personas">Alumnos y profesores</button>
+      <button class="admin-only" data-page="finanzas">Finanzas</button>
+      <button class="admin-only" data-page="reportes">Reportes</button>
+    </nav>
+    <button id="logout-btn" class="logout">Salir</button>
+  </aside>
+
+  <main class="content">
+    <div class="topbar">
+      <h2 id="page-title">Inicio</h2>
+      <span id="role-pill"></span>
+    </div>
+    <div id="page-content"></div>
+  </main>
+</section>
+
+<div id="modal" class="modal-backdrop hidden">
+  <div class="modal-card">
+    <h3 id="modal-title"></h3>
+    <div id="modal-fields" class="form-grid"></div>
+    <div class="modal-actions">
+      <button id="cancel-modal" class="btn secondary">Cancelar</button>
+      <button id="save-modal" class="btn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const SUPABASE_URL = 'https://eodngcsolkixjkgjipzp.supabase.co'
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_cJ01J0FhhLL0Lzgrz-64qw_Bdeoro_z'
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+
+const authView = document.getElementById('auth-view')
+const mainView = document.getElementById('main-view')
+const pageContent = document.getElementById('page-content')
+const rolePill = document.getElementById('role-pill')
+const pageTitle = document.getElementById('page-title')
+const modal = document.getElementById('modal')
+const modalTitle = document.getElementById('modal-title')
+const modalFields = document.getElementById('modal-fields')
+
+let currentProfile = null
+let editing = { page:null, id:null }
+
+const cfg = {
+  clases:{table:'classes',title:'Clases',subtitle:'Cargá y administrá clases.',fields:[
+    ['date','date','Fecha'],['time','time','Hora'],['student_name','text','Alumno'],['teacher_name','text','Profesor'],
+    ['status','select','Estado',['Pendiente','Confirmada','Cancelada']],['payment_status','select','Pago',['Pendiente','Pagado']],['value','number','Valor']
+  ]},
+  abiertas:{table:'open_courts',title:'Canchas abiertas',subtitle:'Cupos, categoría y valor por jugador.',fields:[
+    ['date','date','Fecha'],['time','time','Hora'],['category','text','Categoría'],['slots','number','Cupos'],['registered','number','Inscriptos'],
+    ['value','number','Valor por jugador'],['status','select','Estado',['Abierta','Completa','Cerrada','Cancelada']]
+  ]},
+  torneos:{table:'own_tournaments',title:'Torneos propios',subtitle:'Gestión de torneos organizados por Pádel Point.',fields:[
+    ['date','date','Fecha'],['name','text','Nombre'],['category','text','Categoría'],['pairs','number','Parejas'],['expected_income','number','Ingreso previsto'],
+    ['status','select','Estado',['Planificado','Confirmado','Realizado','Cancelado']]
+  ]},
+  terceros:{table:'third_party_tournaments',title:'Torneos de terceros',subtitle:'Alquiler de canchas y saldo pendiente.',fields:[
+    ['date','date','Fecha'],['organizer','text','Organizador'],['courts','number','Canchas'],['value','number','Valor acordado'],['balance','number','Saldo'],
+    ['status','select','Estado',['Reservado','Confirmado','Realizado','Cancelado']]
+  ]},
+  corporativos:{table:'corporate_events',title:'Eventos corporativos',subtitle:'Presupuesto, personas y saldo.',fields:[
+    ['date','date','Fecha'],['company','text','Empresa'],['people','number','Personas'],['budget','number','Presupuesto'],['balance','number','Saldo'],
+    ['status','select','Estado',['Presupuesto','Confirmado','Realizado','Cobrado','Cancelado']]
+  ]},
+  personas:{table:'people',title:'Alumnos y profesores',subtitle:'Base operativa de personas.',fields:[
+    ['name','text','Nombre'],['type','select','Tipo',['Alumno','Profesor','Empresa/Contacto']],['phone','text','Teléfono'],['status','select','Estado',['Activo','Inactivo']]
+  ]},
+  finanzas:{table:'financial_movements',title:'Finanzas',subtitle:'Solo administradora.',fields:[
+    ['date','date','Fecha'],['type','select','Tipo',['income','expense']],['category','text','Categoría'],['description','text','Concepto'],['amount','number','Importe']
+  ]}
+}
+
+const labels = {
+  date:'Fecha',time:'Hora',student_name:'Alumno',teacher_name:'Profesor',status:'Estado',payment_status:'Pago',value:'Valor',
+  category:'Categoría',slots:'Cupos',registered:'Inscriptos',name:'Nombre',pairs:'Parejas',expected_income:'Ingreso previsto',
+  organizer:'Organizador',courts:'Canchas',balance:'Saldo',company:'Empresa',people:'Personas',budget:'Presupuesto',
+  type:'Tipo',phone:'Teléfono',description:'Concepto',amount:'Importe'
+}
+
+const money = v => '$'+Number(v||0).toLocaleString('es-AR')
+
+async function getProfile(userId){
+  const {data,error}=await supabase.from('profiles').select('id,full_name,role').eq('id',userId).single()
+  if(error) throw error
+  return data
+}
+
+async function loadSession(){
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session){
+    authView.classList.remove('hidden')
+    mainView.classList.add('hidden')
+    return
+  }
+  try{
+    currentProfile=await getProfile(session.user.id)
+  }catch(e){
+    alert('No se pudo leer tu perfil.')
+    return
+  }
+  authView.classList.add('hidden')
+  mainView.classList.remove('hidden')
+  rolePill.textContent=currentProfile.role==='admin'?'ADMINISTRADORA':'EMPLEADO'
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',currentProfile.role!=='admin'))
+  await navigate('dashboard')
+}
+
+document.getElementById('login-btn').addEventListener('click',async()=>{
+  const email=document.getElementById('email').value.trim()
+  const password=document.getElementById('password').value
+  document.getElementById('login-error').textContent='Ingresando...'
+  const {error}=await supabase.auth.signInWithPassword({email,password})
+  if(error){
+    document.getElementById('login-error').textContent='Email o contraseña incorrectos.'
+    return
+  }
+  document.getElementById('login-error').textContent=''
+  await loadSession()
+})
+
+document.getElementById('logout-btn').addEventListener('click',async()=>{
+  await supabase.auth.signOut()
+  currentProfile=null
+  authView.classList.remove('hidden')
+  mainView.classList.add('hidden')
+})
+
+document.querySelectorAll('nav button[data-page]').forEach(btn=>{
+  btn.addEventListener('click',()=>navigate(btn.dataset.page))
+})
+
+async function navigate(page){
+  if(['finanzas','reportes'].includes(page)&&currentProfile?.role!=='admin'){alert('Acceso no autorizado');return}
+  const titles={dashboard:'Inicio',planner:'Planner',clases:'Clases',abiertas:'Canchas abiertas',torneos:'Torneos propios',
+    terceros:'Torneos de terceros',corporativos:'Eventos corporativos',personas:'Alumnos y profesores',finanzas:'Finanzas',reportes:'Reportes'}
+  pageTitle.textContent=titles[page]
+  if(page==='dashboard') return renderDashboard()
+  if(page==='planner') return renderPlanner()
+  if(page==='reportes') return renderReports()
+  return renderCrud(page)
+}
+
+async function renderDashboard(){
+  const [c,a,t,x,e]=await Promise.all([
+    supabase.from('classes').select('*',{count:'exact',head:true}),
+    supabase.from('open_courts').select('*',{count:'exact',head:true}),
+    supabase.from('own_tournaments').select('*',{count:'exact',head:true}),
+    supabase.from('third_party_tournaments').select('*',{count:'exact',head:true}),
+    supabase.from('corporate_events').select('*',{count:'exact',head:true})
+  ])
+  let finance=''
+  if(currentProfile.role==='admin'){
+    const {data:movs=[]}=await supabase.from('financial_movements').select('type,amount')
+    const ingresos=movs.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount),0)
+    const gastos=movs.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0)
+    finance=`<div class="card"><div class="small">Resultado</div><div class="metric">${money(ingresos-gastos)}</div></div>`
+  } else {
+    finance=`<div class="card"><div class="small">Perfil</div><div class="metric" style="font-size:20px">Operativo</div></div>`
+  }
+  pageContent.innerHTML=`<div class="grid">
+    <div class="card"><div class="small">Clases</div><div class="metric">${c.count||0}</div></div>
+    <div class="card"><div class="small">Canchas abiertas</div><div class="metric">${a.count||0}</div></div>
+    <div class="card"><div class="small">Torneos</div><div class="metric">${(t.count||0)+(x.count||0)}</div></div>
+    ${finance}</div><br><div class="card"><b>Eventos corporativos:</b> ${e.count||0}</div>`
+}
+
+async function renderPlanner(){
+  const [c,a,t,x,e]=await Promise.all([
+    supabase.from('classes').select('date,time,student_name'),
+    supabase.from('open_courts').select('date,time,category'),
+    supabase.from('own_tournaments').select('date,name'),
+    supabase.from('third_party_tournaments').select('date,organizer'),
+    supabase.from('corporate_events').select('date,company')
+  ])
+  const rows=[]
+  ;(c.data||[]).forEach(v=>rows.push([v.date,v.time||'','Clase',v.student_name,'clase']))
+  ;(a.data||[]).forEach(v=>rows.push([v.date,v.time||'','Cancha abierta',v.category,'abierta']))
+  ;(t.data||[]).forEach(v=>rows.push([v.date,'','Torneo propio',v.name,'torneo']))
+  ;(x.data||[]).forEach(v=>rows.push([v.date,'','Torneo tercero',v.organizer,'tercero']))
+  ;(e.data||[]).forEach(v=>rows.push([v.date,'','Corporativo',v.company,'corporativo']))
+  rows.sort((p,q)=>(p[0]+p[1]).localeCompare(q[0]+q[1]))
+  pageContent.innerHTML=`<table class="table"><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td><span class="tag ${r[4]}">${r[2]}</span></td><td>${r[3]}</td></tr>`).join('')}
+    </tbody></table>`
+}
+
+async function renderCrud(page){
+  const c=cfg[page]
+  const {data=[],error}=await supabase.from(c.table).select('*').order('id',{ascending:false})
+  if(error){pageContent.innerHTML=`<div class="notice">Error: ${error.message}</div>`;return}
+  const fields=c.fields.map(f=>f[0])
+  pageContent.innerHTML=`<div class="hero"><div><h3>${c.title}</h3><p>${c.subtitle}</p></div><button id="add-btn" class="btn">+ Nuevo</button></div>
+  <table class="table"><thead><tr>${fields.map(f=>`<th>${labels[f]||f}</th>`).join('')}<th></th></tr></thead><tbody>
+  ${data.map(row=>`<tr>${fields.map(f=>`<td>${formatCell(f,row[f])}</td>`).join('')}<td><div class="actions">
+    <button class="btn secondary edit-btn" data-id="${row.id}">Editar</button>
+    <button class="btn danger delete-btn" data-id="${row.id}">Borrar</button></div></td></tr>`).join('')}
+  </tbody></table>`
+  document.getElementById('add-btn').addEventListener('click',()=>openModal(page,null))
+  document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click',()=>openModal(page,Number(b.dataset.id))))
+  document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click',()=>deleteRow(page,Number(b.dataset.id))))
+}
+
+function formatCell(field,v){
+  if(['value','expected_income','balance','budget','amount'].includes(field)) return money(v)
+  if(field==='type'&&v==='income') return 'Ingreso'
+  if(field==='type'&&v==='expense') return 'Gasto'
+  return v??''
+}
+
+async function openModal(page,id){
+  editing={page,id}
+  const c=cfg[page]
+  let row={}
+  if(id){
+    const {data,error}=await supabase.from(c.table).select('*').eq('id',id).single()
+    if(error){alert(error.message);return}
+    row=data
+  }
+  modalTitle.textContent=id?`Editar ${c.title}`:`Nuevo · ${c.title}`
+  modalFields.innerHTML=c.fields.map(([key,type,label,opts])=>{
+    const val=row[key]??''
+    if(type==='select'){
+      return `<div><label>${label}</label><select id="f_${key}">
+        ${opts.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}
+      </select></div>`
+    }
+    return `<div><label>${label}</label><input id="f_${key}" type="${type}" value="${val}"></div>`
+  }).join('')
+  modal.classList.remove('hidden')
+}
+
+document.getElementById('cancel-modal').addEventListener('click',()=>modal.classList.add('hidden'))
+
+document.getElementById('save-modal').addEventListener('click',async()=>{
+  const {page,id}=editing
+  const c=cfg[page]
+  const payload={}
+  for(const [key,type] of c.fields){
+    let v=document.getElementById('f_'+key).value
+    if(type==='number') v=Number(v||0)
+    payload[key]=v
+  }
+  const res=id
+    ? await supabase.from(c.table).update(payload).eq('id',id)
+    : await supabase.from(c.table).insert(payload)
+  if(res.error){alert('Error al guardar: '+res.error.message);return}
+  modal.classList.add('hidden')
+  await renderCrud(page)
+})
+
+async function deleteRow(page,id){
+  if(!confirm('¿Seguro que querés borrar este registro?')) return
+  const c=cfg[page]
+  const {error}=await supabase.from(c.table).delete().eq('id',id)
+  if(error){alert('Error al borrar: '+error.message);return}
+  await renderCrud(page)
+}
+
+async function renderReports(){
+  const {data:movs=[],error}=await supabase.from('financial_movements').select('type,amount')
+  if(error){pageContent.innerHTML=`<div class="notice">${error.message}</div>`;return}
+  const ingresos=movs.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount),0)
+  const gastos=movs.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0)
+  const resultado=ingresos-gastos
+  pageContent.innerHTML=`<div class="grid">
+    <div class="card"><div class="small">Ingresos</div><div class="metric">${money(ingresos)}</div></div>
+    <div class="card"><div class="small">Gastos</div><div class="metric">${money(gastos)}</div></div>
+    <div class="card"><div class="small">Resultado</div><div class="metric">${money(resultado)}</div></div>
+    <div class="card"><div class="small">50% por socia</div><div class="metric">${money(resultado/2)}</div></div>
+  </div>`
+}
+
+loadSession()
+</script>
 </body>
 </html>
