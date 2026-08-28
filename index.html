@@ -274,10 +274,9 @@ async function getFinanceData(){
   const nm=new Date(financeYear,financeMonth+1,1)
   const nextDate=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}-01`
 
-  const [extClasses,extPayments,extLiquids,openCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
+  const [extClasses,extPayments,openCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
     classesSupabase.from('clases').select('id,fecha').gte('fecha',startDate).lt('fecha',nextDate),
     classesSupabase.from('pagos').select('fecha_cobro,importe').gte('fecha_cobro',startDate).lt('fecha_cobro',nextDate),
-    classesSupabase.from('liquidaciones_profesores').select('mes,total_a_liquidar').gte('mes',startDate).lt('mes',nextDate),
     supabase.from('open_courts').select('*'),
     supabase.from('own_tournaments').select('*'),
     supabase.from('third_party_tournaments').select('*'),
@@ -293,7 +292,7 @@ async function getFinanceData(){
 
   const classCount=(extClasses.data||[]).length
   const classIncome=(extPayments.data||[]).reduce((s,x)=>s+Number(x.importe||0),0)
-  const teacherExpense=(extLiquids.data||[]).reduce((s,x)=>s+Number(x.total_a_liquidar||0),0)
+  const teacherExpense=classIncome*0.50
 
   const openIncome=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+(Number(x.registered||0)*Number(x.value||0)),0)
   const coordinatorExpense=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+Number(x.coordinator_payment||0),0)
@@ -312,7 +311,7 @@ async function getFinanceData(){
   const pending=thirdPending+corpPending
   const result=totalBilling-totalExpenses-hubCommission
 
-  const externalErrors=[extClasses.error,extPayments.error,extLiquids.error].filter(Boolean).map(e=>e.message).join(' · ')
+  const externalErrors=[extClasses.error,extPayments.error].filter(Boolean).map(e=>e.message).join(' · ')
 
   return {classCount,classIncome,teacherExpense,openIncome,coordinatorExpense,tournamentIncome,
     thirdCollected,thirdPending,corpCollected,corpPending,manualIncome,manualExpenses,
@@ -468,7 +467,7 @@ async function renderFinance(){
         <b>${money(f.coordinatorExpense)}</b>
       </div>
       <div class="finance-source">
-        <div><div class="name">Pago a profesores de clases</div><div class="details">Traído automáticamente del programa de clases</div></div>
+        <div><div class="name">Pago a profesores de clases</div><div class="details">50% de los ingresos de clases del mes</div></div>
         <b>${money(f.teacherExpense)}</b>
       </div>
     </div>
