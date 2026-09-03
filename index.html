@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pádel Point Gestión</title>
+<!-- v1.1-SYNC-CANCHAS-ABIERTAS -->
 <style>
 :root{
   --bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6c7783;--line:#e6e9ee;
@@ -272,17 +273,22 @@ async function getFinanceData(){
   const nm=new Date(financeYear,financeMonth+1,1)
   const nextDate=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}-01`
 
-  const [extClasses,extPayments,openCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
+  const [extClasses,extPayments,extOpenCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
     classesSupabase.from('clases').select('id,fecha').gte('fecha',startDate).lt('fecha',nextDate),
     classesSupabase.from('pagos').select('fecha_cobro,importe').gte('fecha_cobro',startDate).lt('fecha_cobro',nextDate),
-    supabase.from('open_courts').select('*'),
+    classesSupabase.from('canchas_abiertas').select('*').gte('fecha',startDate).lt('fecha',nextDate),
     supabase.from('own_tournaments').select('*'),
     supabase.from('third_party_tournaments').select('*'),
     supabase.from('corporate_events').select('*'),
     supabase.from('financial_movements').select('*')
   ])
 
-  const a=(openCourts.data||[]).filter(x=>monthKey(x.date)===key)
+  const a=(extOpenCourts.data||[]).filter(x=>x.estado!=='Cancelada')
+  let openPlayers=[]
+  if(a.length){
+    const {data,error}=await classesSupabase.from('cancha_abierta_jugadores').select('*').in('cancha_abierta_id',a.map(x=>x.id))
+    if(!error) openPlayers=data||[]
+  }
   const t=(ownTournaments.data||[]).filter(x=>monthKey(x.date)===key)
   const th=(thirdParty.data||[]).filter(x=>monthKey(x.date)===key)
   const co=(corporate.data||[]).filter(x=>monthKey(x.date)===key)
@@ -292,8 +298,14 @@ async function getFinanceData(){
   const classIncome=(extPayments.data||[]).reduce((s,x)=>s+Number(x.importe||0),0)
   const teacherExpense=classIncome*0.50
 
-  const openIncome=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+(Number(x.registered||0)*Number(x.value||0)),0)
-  const coordinatorExpense=a.filter(x=>x.status!=='Cancelada').reduce((s,x)=>s+Number(x.coordinator_payment||0),0)
+  const openIncome=openPlayers
+    .filter(x=>x.pagado===true)
+    .reduce((s,x)=>s+Number(x.importe_pagado||x.importe_esperado||0),0)
+  const coordinatorExpense=a
+    .filter(x=>x.coordinador_pagado===true)
+    .reduce((s,x)=>s+Number(x.coordinador_importe||0),0)
+  const openResult=openIncome-coordinatorExpense
+  const openHubCommission=Math.max(0,openResult)*0.10
   const tournamentIncome=t.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.expected_income||0),0)
   const thirdCollected=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.value||0)-Number(x.balance||0)),0)
   const thirdPending=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
@@ -304,14 +316,15 @@ async function getFinanceData(){
 
   const automaticIncome=classIncome+openIncome+tournamentIncome+thirdCollected+corpCollected
   const totalBilling=automaticIncome+manualIncome
-  const hubCommission=totalBilling*0.10
+  const commissionBaseWithoutOpen=Math.max(0,totalBilling-openIncome)
+  const hubCommission=(commissionBaseWithoutOpen*0.10)+openHubCommission
   const totalExpenses=manualExpenses+coordinatorExpense+teacherExpense
   const pending=thirdPending+corpPending
   const result=totalBilling-totalExpenses-hubCommission
 
-  const externalErrors=[extClasses.error,extPayments.error].filter(Boolean).map(e=>e.message).join(' · ')
+  const externalErrors=[extClasses.error,extPayments.error,extOpenCourts.error].filter(Boolean).map(e=>e.message).join(' · ')
 
-  return {classCount,classIncome,teacherExpense,openIncome,coordinatorExpense,tournamentIncome,
+  return {classCount,classIncome,teacherExpense,openIncome,coordinatorExpense,openResult,openHubCommission,tournamentIncome,
     thirdCollected,thirdPending,corpCollected,corpPending,manualIncome,manualExpenses,
     automaticIncome,totalBilling,hubCommission,totalExpenses,pending,result,movements:mov,externalErrors}
 }
@@ -339,7 +352,7 @@ async function renderDashboard(){
 async function renderPlanner(){
   const [c,a,t,x,e]=await Promise.all([
     supabase.from('classes').select('date,time,student_name,status'),
-    supabase.from('open_courts').select('date,time,category,status'),
+    classesSupabase.from('canchas_abiertas').select('fecha,hora_inicio,tipo,categoria,estado'),
     supabase.from('own_tournaments').select('date,name,status'),
     supabase.from('third_party_tournaments').select('date,organizer,status'),
     supabase.from('corporate_events').select('date,company,status')
@@ -353,7 +366,7 @@ async function renderPlanner(){
   }
 
   ;(c.data||[]).filter(v=>v.status!=='Cancelada').forEach(v=>push(v.date,{type:'clase',text:`${v.time?v.time.slice(0,5)+' ':''}Clase · ${v.student_name}`}))
-  ;(a.data||[]).filter(v=>v.status!=='Cancelada').forEach(v=>push(v.date,{type:'abierta',text:`${v.time?v.time.slice(0,5)+' ':''}Abierta · ${v.category}`}))
+  ;(a.data||[]).filter(v=>v.estado!=='Cancelada').forEach(v=>push(v.fecha,{type:'abierta',text:`${v.hora_inicio?v.hora_inicio.slice(0,5)+' ':''}Abierta · ${v.tipo||''} ${v.categoria||''}`.trim()}))
   ;(t.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'torneo',text:`Torneo · ${v.name}`}))
   ;(x.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'tercero',text:`Torneo 3° · ${v.organizer}`}))
   ;(e.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'corporativo',text:`Empresa · ${v.company}`}))
@@ -450,7 +463,16 @@ async function renderFinance(){
     <div class="card" style="margin-top:16px">
       <h3 style="margin-top:0">Facturación · ${monthName} ${financeYear}</h3>
       <div class="finance-source"><div><div class="name">Clases</div><div class="details">Datos automáticos del programa de clases</div></div><div><b>${money(f.classIncome)}</b><div class="small">${f.classCount} clases en el mes</div></div></div>
-      <div class="finance-source"><div><div class="name">Canchas abiertas</div><div class="details">Inscriptos × valor por jugador</div></div><b>${money(f.openIncome)}</b></div>
+      <div class="finance-source">
+        <div>
+          <div class="name">Canchas abiertas</div>
+          <div class="details">Tomado automáticamente desde Gestión de Clases · Cobrado ${money(f.openIncome)} – Coordinador ${money(f.coordinatorExpense)} = Resultado ${money(f.openResult)}</div>
+        </div>
+        <div style="text-align:right">
+          <b>${money(f.openResult)}</b>
+          <div class="small">Comisión HUB 10%: ${money(f.openHubCommission)}</div>
+        </div>
+      </div>
       <div class="finance-source"><div><div class="name">Torneos propios</div><div class="details">Ingreso previsto</div></div><b>${money(f.tournamentIncome)}</b></div>
       <div class="finance-source"><div><div class="name">Torneos de terceros</div><div class="details">Valor menos saldo</div></div><div><b>${money(f.thirdCollected)}</b><div class="small">Pendiente ${money(f.thirdPending)}</div></div></div>
       <div class="finance-source"><div><div class="name">Eventos corporativos</div><div class="details">Presupuesto menos saldo</div></div><div><b>${money(f.corpCollected)}</b><div class="small">Pendiente ${money(f.corpPending)}</div></div></div>
@@ -459,7 +481,7 @@ async function renderFinance(){
     <div class="card" style="margin-top:16px">
       <h3 style="margin-top:0">Gastos automáticos</h3>
       <div class="finance-source">
-        <div><div class="name">Coordinadores de canchas abiertas</div><div class="details">Suma del pago al coordinador de cada cancha abierta del mes</div></div>
+        <div><div class="name">Coordinadores de canchas abiertas</div><div class="details">Salida tomada automáticamente desde Gestión de Clases cuando el coordinador figura pagado</div></div>
         <b>${money(f.coordinatorExpense)}</b>
       </div>
       <div class="finance-source">
