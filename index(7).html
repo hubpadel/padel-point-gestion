@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pádel Point Gestión</title>
+<!-- v1.1-SYNC-CANCHAS-ABIERTAS -->
+<style>
+:root{
+  --bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#6c7783;--line:#e6e9ee;
+  --dark:#111827;--accent:#1f6f5f;--soft:#e9f5f1;
+  --clase:#1f6f5f;--abierta:#d48a0f;--torneo:#315fa8;--tercero:#6f42c1;--corporativo:#b64747;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.hidden{display:none!important}
+.center-screen{min-height:100vh;display:grid;place-items:center}
+.login-card{width:min(420px,90vw);background:#fff;padding:28px;border-radius:18px;border:1px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,.08)}
+.login-card h1{margin:0 0 8px;font-size:34px}
+.login-card p{margin:0 0 18px}
+.login-card input{width:100%;padding:12px;margin:8px 0;border:1px solid var(--line);border-radius:10px;background:#eef4ff}
+.login-card button{width:100%;padding:12px;margin-top:10px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer}
+.error{color:#b64747;font-size:12px;margin-top:10px}
+.sidebar{position:fixed;inset:0 auto 0 0;width:250px;background:var(--dark);padding:24px 16px;color:#fff;overflow:auto}
+.brand{font-size:22px;font-weight:900;margin-bottom:24px}
+nav{display:flex;flex-direction:column;gap:6px}
+nav button,.logout{border:0;background:transparent;color:#dbe1e8;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer}
+nav button:hover{background:#253041}
+.logout{position:absolute;bottom:20px;left:16px;right:16px;border:1px solid #394558}
+.content{margin-left:250px;min-height:100vh}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;background:#fff;border-bottom:1px solid var(--line)}
+#role-pill{padding:6px 10px;border-radius:999px;background:var(--soft);color:var(--accent);font-weight:800;font-size:12px}
+#page-content{padding:24px}
+.hero{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.hero h3{margin:0}.hero p{margin:4px 0 0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+.metric{font-size:28px;font-weight:900;margin-top:7px}
+.small{font-size:12px;color:var(--muted)}
+.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.table th,.table td{padding:11px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left}
+.table th{font-size:11px;color:var(--muted);text-transform:uppercase}
+.tag{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800}
+.clase{background:#e9f5f1;color:var(--clase)} .abierta{background:#fff2dc;color:#9a6800}
+.torneo{background:#eaf1ff;color:var(--torneo)} .tercero{background:#f0e9ff;color:var(--tercero)}
+.corporativo{background:#fdeaea;color:var(--corporativo)}
+.btn{border:0;background:var(--accent);color:#fff;border-radius:9px;padding:10px 14px;font-weight:800;cursor:pointer}
+.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+.btn.danger{background:#fff;color:#b64747;border:1px solid #e2bcbc}
+.actions{display:flex;gap:6px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.55);display:grid;place-items:center;padding:20px;z-index:20}
+.modal-card{width:min(680px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:22px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
+.form-grid input,.form-grid select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.notice{background:#fff7e8;border:1px solid #f0dfb9;color:#8a6110;padding:12px;border-radius:10px;margin-bottom:14px}
+
+.planner-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.planner-toolbar h3{margin:0;font-size:22px;text-transform:capitalize}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#fff;border:1px solid var(--line);padding:7px 9px;border-radius:999px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dot.clase{background:var(--clase)}.dot.abierta{background:var(--abierta)}.dot.torneo{background:var(--torneo)}
+.dot.tercero{background:var(--tercero)}.dot.corporativo{background:var(--corporativo)}
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr);background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.weekday{padding:10px;text-align:center;font-size:11px;font-weight:800;color:var(--muted);background:#fafbfc;border-right:1px solid var(--line)}
+.weekday:nth-child(7){border-right:0}
+.day-cell{min-height:125px;padding:8px;border-top:1px solid var(--line);border-right:1px solid var(--line);background:#fff;overflow:hidden}
+.day-cell:nth-child(7n){border-right:0}
+.day-cell.outside{background:#fafbfc;color:#a8b0ba}
+.day-number{font-size:12px;font-weight:900;margin-bottom:5px}
+.cal-event{font-size:10px;padding:5px 6px;border-radius:6px;margin-top:4px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-event.clase{background:#e9f5f1;color:var(--clase)}
+.cal-event.abierta{background:#fff2dc;color:#9a6800}
+.cal-event.torneo{background:#eaf1ff;color:var(--torneo)}
+.cal-event.tercero{background:#f0e9ff;color:var(--tercero)}
+.cal-event.corporativo{background:#fdeaea;color:var(--corporativo)}
+.finance-source{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.finance-source:last-child{border-bottom:0}
+.finance-source .name{font-weight:800}
+.finance-source .details{font-size:12px;color:var(--muted);margin-top:3px}
+.month-select{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.month-select select{padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.hub-card{background:#f0e9ff;border:1px solid #ddd1f5}
+.hub-card .metric{color:#6f42c1}
+.highlight{background:#f8fbfa;border:1px solid #dcebe7}
+
+@media(max-width:900px){.sidebar{width:205px}.content{margin-left:205px}.grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<section id="auth-view" class="center-screen">
+  <div class="login-card">
+    <h1>PÁDEL POINT</h1>
+    <p>Gestión integral</p>
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Contraseña">
+    <button id="login-btn">Ingresar</button>
+    <div id="login-error" class="error"></div>
+  </div>
+</section>
+
+<section id="main-view" class="hidden">
+  <aside class="sidebar">
+    <div class="brand">PÁDEL POINT</div>
+    <nav>
+      <button data-page="dashboard">Inicio</button>
+      <button data-page="planner">Planner</button>
+      <button data-page="abiertas">Canchas abiertas</button>
+      <button data-page="torneos">Torneos propios</button>
+      <button data-page="terceros">Torneos de terceros</button>
+      <button data-page="corporativos">Eventos corporativos</button>
+      <button class="admin-only" data-page="finanzas">Finanzas</button>
+      <button class="admin-only" data-page="reportes">Reportes</button>
+    </nav>
+    <button id="logout-btn" class="logout">Salir</button>
+  </aside>
+
+  <main class="content">
+    <div class="topbar">
+      <h2 id="page-title">Inicio</h2>
+      <span id="role-pill"></span>
+    </div>
+    <div id="page-content"></div>
+  </main>
+</section>
+
+<div id="modal" class="modal-backdrop hidden">
+  <div class="modal-card">
+    <h3 id="modal-title"></h3>
+    <div id="modal-fields" class="form-grid"></div>
+    <div class="modal-actions">
+      <button id="cancel-modal" class="btn secondary">Cancelar</button>
+      <button id="save-modal" class="btn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const SUPABASE_URL = 'https://eodngcsolkixjkgjipzp.supabase.co'
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_cJ01J0FhhLL0Lzgrz-64qw_Bdeoro_z'
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+
+const CLASSES_SUPABASE_URL = 'https://jpzoaskdtgfvvfpdbqox.supabase.co'
+const CLASSES_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yj3PONOs9YIlwYFiqiuV-A_ogIDN-Pr'
+const classesSupabase = createClient(CLASSES_SUPABASE_URL, CLASSES_SUPABASE_PUBLISHABLE_KEY)
+
+const authView = document.getElementById('auth-view')
+const mainView = document.getElementById('main-view')
+const pageContent = document.getElementById('page-content')
+const rolePill = document.getElementById('role-pill')
+const pageTitle = document.getElementById('page-title')
+const modal = document.getElementById('modal')
+const modalTitle = document.getElementById('modal-title')
+const modalFields = document.getElementById('modal-fields')
+
+let currentProfile = null
+let editing = { page:null, id:null }
+let plannerDate = new Date()
+let financeMonth = new Date().getMonth()
+let financeYear = new Date().getFullYear()
+
+const cfg = {
+  clases:{table:'classes',title:'Clases',subtitle:'Cargá y administrá clases.',fields:[
+    ['date','date','Fecha'],['time','time','Hora'],['student_name','text','Alumno'],['teacher_name','text','Profesor'],
+    ['status','select','Estado',['Pendiente','Confirmada','Cancelada']],['payment_status','select','Pago',['Pendiente','Pagado']],['value','number','Valor']
+  ]},
+  abiertas:{table:'open_courts',title:'Canchas abiertas',subtitle:'Cupos, categoría, valor y pago al coordinador.',fields:[
+    ['date','date','Fecha'],['time','time','Hora'],['category','text','Categoría'],['slots','number','Cupos'],['registered','number','Inscriptos'],
+    ['value','number','Valor por jugador'],['coordinator_payment','number','Pago coordinador'],
+    ['status','select','Estado',['Abierta','Completa','Cerrada','Cancelada']]
+  ]},
+  torneos:{table:'own_tournaments',title:'Torneos propios',subtitle:'Gestión de torneos organizados por Pádel Point.',fields:[
+    ['date','date','Fecha'],['name','text','Nombre'],['category','text','Categoría'],['pairs','number','Parejas'],['expected_income','number','Ingreso previsto'],
+    ['status','select','Estado',['Planificado','Confirmado','Realizado','Cancelado']]
+  ]},
+  terceros:{table:'third_party_tournaments',title:'Torneos de terceros',subtitle:'Alquiler de canchas y saldo pendiente.',fields:[
+    ['date','date','Fecha'],['organizer','text','Organizador'],['courts','number','Canchas'],['value','number','Valor acordado'],['balance','number','Saldo'],
+    ['status','select','Estado',['Reservado','Confirmado','Realizado','Cancelado']]
+  ]},
+  corporativos:{table:'corporate_events',title:'Eventos corporativos',subtitle:'Presupuesto, personas y saldo.',fields:[
+    ['date','date','Fecha'],['company','text','Empresa'],['people','number','Personas'],['budget','number','Presupuesto'],['balance','number','Saldo'],
+    ['status','select','Estado',['Presupuesto','Confirmado','Realizado','Cobrado','Cancelado']]
+  ]},
+  personas:{table:'people',title:'Alumnos y profesores',subtitle:'Base operativa de personas.',fields:[
+    ['name','text','Nombre'],['type','select','Tipo',['Alumno','Profesor','Empresa/Contacto']],['phone','text','Teléfono'],['status','select','Estado',['Activo','Inactivo']]
+  ]},
+  finanzas:{table:'financial_movements',title:'Finanzas',subtitle:'Solo administradora.',fields:[
+    ['date','date','Fecha'],['type','select','Tipo',['income','expense']],['category','text','Categoría'],['description','text','Concepto'],['amount','number','Importe']
+  ]}
+}
+
+const labels = {
+  date:'Fecha',time:'Hora',student_name:'Alumno',teacher_name:'Profesor',status:'Estado',payment_status:'Pago',value:'Valor',
+  category:'Categoría',slots:'Cupos',registered:'Inscriptos',coordinator_payment:'Pago coordinador',name:'Nombre',pairs:'Parejas',expected_income:'Ingreso previsto',
+  organizer:'Organizador',courts:'Canchas',balance:'Saldo',company:'Empresa',people:'Personas',budget:'Presupuesto',
+  type:'Tipo',phone:'Teléfono',description:'Concepto',amount:'Importe'
+}
+
+const money = v => '$'+Number(v||0).toLocaleString('es-AR')
+const monthKey = dateStr => dateStr ? dateStr.slice(0,7) : ''
+const selectedMonthKey = () => `${financeYear}-${String(financeMonth+1).padStart(2,'0')}`
+
+async function getProfile(userId){
+  const {data,error}=await supabase.from('profiles').select('id,full_name,role').eq('id',userId).single()
+  if(error) throw error
+  return data
+}
+
+async function loadSession(){
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session){
+    authView.classList.remove('hidden')
+    mainView.classList.add('hidden')
+    return
+  }
+  try{
+    currentProfile=await getProfile(session.user.id)
+  }catch(e){
+    alert('No se pudo leer tu perfil.')
+    return
+  }
+  authView.classList.add('hidden')
+  mainView.classList.remove('hidden')
+  rolePill.textContent=currentProfile.role==='admin'?'ADMINISTRADORA':'EMPLEADO'
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',currentProfile.role!=='admin'))
+  await navigate('dashboard')
+}
+
+document.getElementById('login-btn').addEventListener('click',async()=>{
+  const email=document.getElementById('email').value.trim()
+  const password=document.getElementById('password').value
+  document.getElementById('login-error').textContent='Ingresando...'
+  const {error}=await supabase.auth.signInWithPassword({email,password})
+  if(error){
+    document.getElementById('login-error').textContent='Email o contraseña incorrectos.'
+    return
+  }
+  document.getElementById('login-error').textContent=''
+  await loadSession()
+})
+
+document.getElementById('logout-btn').addEventListener('click',async()=>{
+  await supabase.auth.signOut()
+  currentProfile=null
+  authView.classList.remove('hidden')
+  mainView.classList.add('hidden')
+})
+
+document.querySelectorAll('nav button[data-page]').forEach(btn=>{
+  btn.addEventListener('click',()=>navigate(btn.dataset.page))
+})
+
+async function navigate(page){
+  if(['finanzas','reportes'].includes(page)&&currentProfile?.role!=='admin'){alert('Acceso no autorizado');return}
+  const titles={dashboard:'Inicio',planner:'Planner',clases:'Clases',abiertas:'Canchas abiertas',torneos:'Torneos propios',
+    terceros:'Torneos de terceros',corporativos:'Eventos corporativos',personas:'Alumnos y profesores',finanzas:'Finanzas',reportes:'Reportes'}
+  pageTitle.textContent=titles[page]
+  if(page==='dashboard') return renderDashboard()
+  if(page==='planner') return renderPlanner()
+  if(page==='finanzas') return renderFinance()
+  if(page==='reportes') return renderReports()
+  return renderCrud(page)
+}
+
+async function getFinanceData(){
+  const key=selectedMonthKey()
+  const startDate=`${key}-01`
+  const nm=new Date(financeYear,financeMonth+1,1)
+  const nextDate=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}-01`
+
+  const [extClasses,extPayments,extOpenCourts,ownTournaments,thirdParty,corporate,movements] = await Promise.all([
+    classesSupabase.from('clases').select('id,fecha').gte('fecha',startDate).lt('fecha',nextDate),
+    classesSupabase.from('pagos').select('fecha_cobro,importe').gte('fecha_cobro',startDate).lt('fecha_cobro',nextDate),
+    classesSupabase.from('canchas_abiertas').select('*').gte('fecha',startDate).lt('fecha',nextDate),
+    supabase.from('own_tournaments').select('*'),
+    supabase.from('third_party_tournaments').select('*'),
+    supabase.from('corporate_events').select('*'),
+    supabase.from('financial_movements').select('*')
+  ])
+
+  const a=(extOpenCourts.data||[]).filter(x=>x.estado!=='Cancelada')
+  let openPlayers=[]
+  if(a.length){
+    const {data,error}=await classesSupabase.from('cancha_abierta_jugadores').select('*').in('cancha_abierta_id',a.map(x=>x.id))
+    if(!error) openPlayers=data||[]
+  }
+  const t=(ownTournaments.data||[]).filter(x=>monthKey(x.date)===key)
+  const th=(thirdParty.data||[]).filter(x=>monthKey(x.date)===key)
+  const co=(corporate.data||[]).filter(x=>monthKey(x.date)===key)
+  const mov=(movements.data||[]).filter(x=>monthKey(x.date)===key)
+
+  const classCount=(extClasses.data||[]).length
+  const classIncome=(extPayments.data||[]).reduce((s,x)=>s+Number(x.importe||0),0)
+  const teacherExpense=classIncome*0.50
+
+  const openIncome=openPlayers
+    .filter(x=>x.pagado===true)
+    .reduce((s,x)=>s+Number(x.importe_pagado||x.importe_esperado||0),0)
+  const coordinatorExpense=a
+    .filter(x=>x.coordinador_pagado===true)
+    .reduce((s,x)=>s+Number(x.coordinador_importe||0),0)
+  const openResult=openIncome-coordinatorExpense
+  const openHubCommission=Math.max(0,openResult)*0.10
+  const tournamentIncome=t.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.expected_income||0),0)
+  const thirdCollected=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.value||0)-Number(x.balance||0)),0)
+  const thirdPending=th.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
+  const corpCollected=co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Math.max(0,Number(x.budget||0)-Number(x.balance||0)),0)
+  const corpPending=co.filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+Number(x.balance||0),0)
+  const manualIncome=mov.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount||0),0)
+  const manualExpenses=mov.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount||0),0)
+
+  const automaticIncome=classIncome+openIncome+tournamentIncome+thirdCollected+corpCollected
+  const totalBilling=automaticIncome+manualIncome
+  const commissionBaseWithoutOpen=Math.max(0,totalBilling-openIncome)
+  const hubCommission=(commissionBaseWithoutOpen*0.10)+openHubCommission
+  const totalExpenses=manualExpenses+coordinatorExpense+teacherExpense
+  const pending=thirdPending+corpPending
+  const result=totalBilling-totalExpenses-hubCommission
+
+  const externalErrors=[extClasses.error,extPayments.error,extOpenCourts.error].filter(Boolean).map(e=>e.message).join(' · ')
+
+  return {classCount,classIncome,teacherExpense,openIncome,coordinatorExpense,openResult,openHubCommission,tournamentIncome,
+    thirdCollected,thirdPending,corpCollected,corpPending,manualIncome,manualExpenses,
+    automaticIncome,totalBilling,hubCommission,totalExpenses,pending,result,movements:mov,externalErrors}
+}
+
+async function renderDashboard(){
+  const [a,t,x,e]=await Promise.all([
+    supabase.from('open_courts').select('*',{count:'exact',head:true}),
+    supabase.from('own_tournaments').select('*',{count:'exact',head:true}),
+    supabase.from('third_party_tournaments').select('*',{count:'exact',head:true}),
+    supabase.from('corporate_events').select('*',{count:'exact',head:true})
+  ])
+  let finance=''
+  if(currentProfile.role==='admin'){
+    const f=await getFinanceData()
+    finance=`<div class="card"><div class="small">Resultado</div><div class="metric">${money(f.result)}</div></div>`
+  } else {
+    finance=`<div class="card"><div class="small">Perfil</div><div class="metric" style="font-size:20px">Operativo</div></div>`
+  }
+  pageContent.innerHTML=`<div class="grid">
+    <div class="card"><div class="small">Canchas abiertas</div><div class="metric">${a.count||0}</div></div>
+    <div class="card"><div class="small">Torneos</div><div class="metric">${(t.count||0)+(x.count||0)}</div></div>
+    ${finance}</div><br><div class="card"><b>Eventos corporativos:</b> ${e.count||0}</div>`
+}
+
+async function renderPlanner(){
+  const [c,a,t,x,e]=await Promise.all([
+    supabase.from('classes').select('date,time,student_name,status'),
+    classesSupabase.from('canchas_abiertas').select('fecha,hora_inicio,tipo,categoria,estado'),
+    supabase.from('own_tournaments').select('date,name,status'),
+    supabase.from('third_party_tournaments').select('date,organizer,status'),
+    supabase.from('corporate_events').select('date,company,status')
+  ])
+
+  const events={}
+  const push=(date,obj)=>{
+    if(!date)return
+    if(!events[date])events[date]=[]
+    events[date].push(obj)
+  }
+
+  ;(c.data||[]).filter(v=>v.status!=='Cancelada').forEach(v=>push(v.date,{type:'clase',text:`${v.time?v.time.slice(0,5)+' ':''}Clase · ${v.student_name}`}))
+  ;(a.data||[]).filter(v=>v.estado!=='Cancelada').forEach(v=>push(v.fecha,{type:'abierta',text:`${v.hora_inicio?v.hora_inicio.slice(0,5)+' ':''}Abierta · ${v.tipo||''} ${v.categoria||''}`.trim()}))
+  ;(t.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'torneo',text:`Torneo · ${v.name}`}))
+  ;(x.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'tercero',text:`Torneo 3° · ${v.organizer}`}))
+  ;(e.data||[]).filter(v=>v.status!=='Cancelado').forEach(v=>push(v.date,{type:'corporativo',text:`Empresa · ${v.company}`}))
+
+  const year=plannerDate.getFullYear()
+  const month=plannerDate.getMonth()
+  const first=new Date(year,month,1)
+  const firstMondayIndex=(first.getDay()+6)%7
+  const start=new Date(year,month,1-firstMondayIndex)
+  const monthName=new Intl.DateTimeFormat('es-AR',{month:'long',year:'numeric'}).format(new Date(year,month,1))
+  const weekdays=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM']
+
+  let cells=''
+  for(let i=0;i<42;i++){
+    const d=new Date(start)
+    d.setDate(start.getDate()+i)
+    const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const outside=d.getMonth()!==month
+    const dayEvents=events[iso]||[]
+    cells+=`<div class="day-cell ${outside?'outside':''}">
+      <div class="day-number">${d.getDate()}</div>
+      ${dayEvents.map(ev=>`<div class="cal-event ${ev.type}" title="${ev.text}">${ev.text}</div>`).join('')}
+    </div>`
+  }
+
+  pageContent.innerHTML=`
+    <div class="planner-toolbar">
+      <button id="prev-month" class="btn secondary">← Mes anterior</button>
+      <h3>${monthName}</h3>
+      <button id="next-month" class="btn secondary">Mes siguiente →</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot clase"></i>Clases</span>
+      <span><i class="dot abierta"></i>Canchas abiertas</span>
+      <span><i class="dot torneo"></i>Torneos propios</span>
+      <span><i class="dot tercero"></i>Torneos de terceros</span>
+      <span><i class="dot corporativo"></i>Corporativos</span>
+    </div>
+    <div class="month-grid">
+      ${weekdays.map(w=>`<div class="weekday">${w}</div>`).join('')}
+      ${cells}
+    </div>`
+
+  document.getElementById('prev-month').addEventListener('click',()=>{
+    plannerDate=new Date(year,month-1,1)
+    renderPlanner()
+  })
+  document.getElementById('next-month').addEventListener('click',()=>{
+    plannerDate=new Date(year,month+1,1)
+    renderPlanner()
+  })
+}
+
+async function renderFinance(){
+  const f=await getFinanceData()
+  const monthName=new Intl.DateTimeFormat('es-AR',{month:'long'}).format(new Date(financeYear,financeMonth,1))
+  const years=[]
+  for(let y=financeYear-2;y<=financeYear+2;y++) years.push(`<option value="${y}" ${y===financeYear?'selected':''}>${y}</option>`)
+
+  pageContent.innerHTML=`
+    <div class="hero">
+      <div>
+        <h3>Finanzas mensuales</h3>
+        <p>Facturación, gastos y Comisión HUB calculados por mes.</p>
+      </div>
+      <button id="add-expense-btn" class="btn">+ Ingreso / gasto manual</button>
+    </div>
+
+    ${f.externalErrors ? `<div class="notice">No se pudieron leer algunos datos del programa de clases: ${f.externalErrors}</div>` : ''}
+    <div class="month-select">
+      <select id="finance-month">
+        ${Array.from({length:12},(_,i)=>{
+          const n=new Intl.DateTimeFormat('es-AR',{month:'long'}).format(new Date(2026,i,1))
+          return `<option value="${i}" ${i===financeMonth?'selected':''}>${n}</option>`
+        }).join('')}
+      </select>
+      <select id="finance-year">${years.join('')}</select>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="small">Facturación del mes</div><div class="metric">${money(f.totalBilling)}</div></div>
+      <div class="card"><div class="small">Gastos del mes</div><div class="metric">${money(f.totalExpenses)}</div></div>
+      <div class="card hub-card"><div class="small">Comisión HUB 10%</div><div class="metric">${money(f.hubCommission)}</div></div>
+      <div class="card highlight"><div class="small">Resultado final</div><div class="metric">${money(f.result)}</div></div>
+    </div>
+
+    <div class="grid" style="margin-top:14px">
+      <div class="card"><div class="small">Pendiente de cobro</div><div class="metric">${money(f.pending)}</div></div>
+      <div class="card"><div class="small">Ingresos automáticos</div><div class="metric">${money(f.automaticIncome)}</div></div>
+      <div class="card"><div class="small">Ingresos manuales</div><div class="metric">${money(f.manualIncome)}</div></div>
+      <div class="card"><div class="small">Gastos manuales</div><div class="metric">${money(f.manualExpenses)}</div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Facturación · ${monthName} ${financeYear}</h3>
+      <div class="finance-source"><div><div class="name">Clases</div><div class="details">Datos automáticos del programa de clases</div></div><div><b>${money(f.classIncome)}</b><div class="small">${f.classCount} clases en el mes</div></div></div>
+      <div class="finance-source">
+        <div>
+          <div class="name">Canchas abiertas</div>
+          <div class="details">Tomado automáticamente desde Gestión de Clases · Cobrado ${money(f.openIncome)} – Coordinador ${money(f.coordinatorExpense)} = Resultado ${money(f.openResult)}</div>
+        </div>
+        <div style="text-align:right">
+          <b>${money(f.openResult)}</b>
+          <div class="small">Comisión HUB 10%: ${money(f.openHubCommission)}</div>
+        </div>
+      </div>
+      <div class="finance-source"><div><div class="name">Torneos propios</div><div class="details">Ingreso previsto</div></div><b>${money(f.tournamentIncome)}</b></div>
+      <div class="finance-source"><div><div class="name">Torneos de terceros</div><div class="details">Valor menos saldo</div></div><div><b>${money(f.thirdCollected)}</b><div class="small">Pendiente ${money(f.thirdPending)}</div></div></div>
+      <div class="finance-source"><div><div class="name">Eventos corporativos</div><div class="details">Presupuesto menos saldo</div></div><div><b>${money(f.corpCollected)}</b><div class="small">Pendiente ${money(f.corpPending)}</div></div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Gastos automáticos</h3>
+      <div class="finance-source">
+        <div><div class="name">Coordinadores de canchas abiertas</div><div class="details">Salida tomada automáticamente desde Gestión de Clases cuando el coordinador figura pagado</div></div>
+        <b>${money(f.coordinatorExpense)}</b>
+      </div>
+      <div class="finance-source">
+        <div><div class="name">Pago a profesores de clases</div><div class="details">50% de los ingresos de clases del mes</div></div>
+        <b>${money(f.teacherExpense)}</b>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Movimientos manuales</h3>
+      <table class="table">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Concepto</th><th>Importe</th></tr></thead>
+        <tbody>${f.movements.map(m=>`<tr><td>${m.date}</td><td>${m.type==='income'?'Ingreso':'Gasto'}</td><td>${m.category}</td><td>${m.description}</td><td>${money(m.amount)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`
+
+  document.getElementById('finance-month').addEventListener('change',e=>{financeMonth=Number(e.target.value);renderFinance()})
+  document.getElementById('finance-year').addEventListener('change',e=>{financeYear=Number(e.target.value);renderFinance()})
+  document.getElementById('add-expense-btn').addEventListener('click',()=>openModal('finanzas',null))
+}
+
+async function renderCrud(page){
+  const c=cfg[page]
+  const {data=[],error}=await supabase.from(c.table).select('*').order('id',{ascending:false})
+  if(error){pageContent.innerHTML=`<div class="notice">Error: ${error.message}</div>`;return}
+  const fields=c.fields.map(f=>f[0])
+  pageContent.innerHTML=`<div class="hero"><div><h3>${c.title}</h3><p>${c.subtitle}</p></div><button id="add-btn" class="btn">+ Nuevo</button></div>
+  <table class="table"><thead><tr>${fields.map(f=>`<th>${labels[f]||f}</th>`).join('')}<th></th></tr></thead><tbody>
+  ${data.map(row=>`<tr>${fields.map(f=>`<td>${formatCell(f,row[f])}</td>`).join('')}<td><div class="actions">
+    <button class="btn secondary edit-btn" data-id="${row.id}">Editar</button>
+    <button class="btn danger delete-btn" data-id="${row.id}">Borrar</button></div></td></tr>`).join('')}
+  </tbody></table>`
+  document.getElementById('add-btn').addEventListener('click',()=>openModal(page,null))
+  document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click',()=>openModal(page,Number(b.dataset.id))))
+  document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click',()=>deleteRow(page,Number(b.dataset.id))))
+}
+
+function formatCell(field,v){
+  if(['value','expected_income','balance','budget','amount','coordinator_payment'].includes(field)) return money(v)
+  if(field==='type'&&v==='income') return 'Ingreso'
+  if(field==='type'&&v==='expense') return 'Gasto'
+  return v??''
+}
+
+async function openModal(page,id){
+  editing={page,id}
+  const c=cfg[page]
+  let row={}
+  if(id){
+    const {data,error}=await supabase.from(c.table).select('*').eq('id',id).single()
+    if(error){alert(error.message);return}
+    row=data
+  }
+  modalTitle.textContent=id?`Editar ${c.title}`:`Nuevo · ${c.title}`
+  modalFields.innerHTML=c.fields.map(([key,type,label,opts])=>{
+    const val=row[key]??''
+    if(type==='select'){
+      return `<div><label>${label}</label><select id="f_${key}">
+        ${opts.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}
+      </select></div>`
+    }
+    return `<div><label>${label}</label><input id="f_${key}" type="${type}" value="${val}"></div>`
+  }).join('')
+  modal.classList.remove('hidden')
+}
+
+document.getElementById('cancel-modal').addEventListener('click',()=>modal.classList.add('hidden'))
+
+document.getElementById('save-modal').addEventListener('click',async()=>{
+  const {page,id}=editing
+  const c=cfg[page]
+  const payload={}
+  for(const [key,type] of c.fields){
+    let v=document.getElementById('f_'+key).value
+    if(type==='number') v=Number(v||0)
+    payload[key]=v
+  }
+  const res=id
+    ? await supabase.from(c.table).update(payload).eq('id',id)
+    : await supabase.from(c.table).insert(payload)
+  if(res.error){alert('Error al guardar: '+res.error.message);return}
+  modal.classList.add('hidden')
+  if(page==='finanzas') await renderFinance()
+  else await renderCrud(page)
+})
+
+async function deleteRow(page,id){
+  if(!confirm('¿Seguro que querés borrar este registro?')) return
+  const c=cfg[page]
+  const {error}=await supabase.from(c.table).delete().eq('id',id)
+  if(error){alert('Error al borrar: '+error.message);return}
+  await renderCrud(page)
+}
+
+async function renderReports(){
+  const f=await getFinanceData()
+  pageContent.innerHTML=`<div class="grid">
+    <div class="card"><div class="small">Facturación</div><div class="metric">${money(f.totalBilling)}</div></div>
+    <div class="card"><div class="small">Gastos</div><div class="metric">${money(f.totalExpenses)}</div></div>
+    <div class="card hub-card"><div class="small">Comisión HUB 10%</div><div class="metric">${money(f.hubCommission)}</div></div>
+    <div class="card highlight"><div class="small">Resultado final</div><div class="metric">${money(f.result)}</div></div>
+  </div>`
+}
+
+loadSession()
+</script>
+</body>
+</html>
